@@ -1,5 +1,15 @@
 #!/usr/bin/env ruby
 
+require 'optparse'
+
+class Array
+  def move_to_end(value)
+    exists = self.include? value
+    self.delete value
+    self << value if exists
+  end
+end
+
 class QemuInvocation
   attr_accessor :ram, :file, :qemu, :flags
 
@@ -57,6 +67,8 @@ class QemuInvocation
 
   def render
     resolve_conflicts do |flags|
+      flags.move_to_end :tee
+
       "#{qemu_command} #{flags.map { |f| OPTION_STRINGS[f] }.join(" ")}"
     end
   end
@@ -70,8 +82,23 @@ q = QemuInvocation.new
 # q.flags << :monitor
 # q.resolve_conflicts!
 
+dry_run = false
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: run.rb [options]"
+
+  opts.on("-f FILE", "--file FILE") { |v| q.file = v }
+  opts.on("-q QEMU", "--qemu QEMU") { |v| q.qemu = v }
+  opts.on("-r RAM", "--ram RAM") { |v| q.ram = v }
+  opts.on("-m", "--monitor") { |v| q.flags << :monitor }
+  opts.on("-i", "--interrupts") { |v| q.flags << :interrupts }
+  opts.on("-v", "--video") { |v| q.flags.delete :no_video }
+  opts.on("-d", "--debug") { |v| q.flags << :debug }
+  opts.on("--dry-run") { |v| dry_run = true }
+end.parse!
+
 p q
 puts q.render
 
-system(q.render)
+system(q.render) unless dry_run
 
