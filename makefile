@@ -9,6 +9,10 @@ ZIGLIB := obj/liboriole.a
 
 ASMSRC := $(shell find asm -name '*.asm')
 ASMOBJ := $(patsubst %.asm,%.o,$(ASMSRC))
+CSRC := $(shell find asm -name '*.c')
+COBJ := $(patsubst %.c,%.o,$(CSRC))
+
+OBJECTS := $(ASMOBJ) $(COBJ)
 
 .PHONY: all clean test
 
@@ -17,10 +21,13 @@ all: oriole.iso
 %.o: %.asm
 	nasm -felf64 -o $@ $<
 
+%.o: %.c
+	x86_64-nightingale-gcc -o $@ -c $< -ffreestanding -Wall -Werror
+
 $(ZIGLIB): $(ZIGSRC)
 	zig build-lib $(ZIGMAIN) --output-dir obj -target x86_64-freestanding
 
-oriole.elf: $(ASMOBJ) $(ZIGLIB)
+oriole.elf: $(OBJECTS) $(ZIGLIB)
 	ld -g -nostdlib -o $@ -T link.ld $^
 
 oriole.iso: oriole.elf grub.cfg
