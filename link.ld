@@ -31,7 +31,7 @@ SECTIONS {
 
     _ro_begin = .;
     .text ALIGN(4K) : AT(ADDR(.text) - VMA)   { *(.text .text.*) }     :text
-    .rodata         : AT(ADDR(.rodata) - VMA) { *(.rodata .rodata.*) }
+    .rodata         : AT(ADDR(.rodata) - VMA) { *(.rodata .rodata.*) } :text
     _ro_end = .;
 
     .data ALIGN(4K) : AT(ADDR(.data) - VMA) { *(.data .data.*) } :data

@@ -4,3 +4,4 @@
 *.iso
 
 /last_output
+zig-cache

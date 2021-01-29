@@ -1,11 +1,10 @@
-
 BUILDMODE ?= debug
 
 CC := x86_64-elf-gcc
 
-ZIGMAIN := kernel/oriole.zig
+ZIGMAIN := kernel/main.zig
 ZIGSRC := $(shell find kernel -name '*.zig')
-ZIGLIB := obj/liboriole.a
+ZIGLIB := obj/oriole.o
 
 ASMSRC := $(shell find asm -name '*.asm')
 ASMOBJ := $(patsubst %.asm,%.o,$(ASMSRC))
@@ -19,13 +18,16 @@ OBJECTS := $(ASMOBJ) $(COBJ)
 all: oriole.iso
 
 %.o: %.asm
+	mkdir -p $(dir $@)
 	nasm -felf64 -o $@ $<
 
 %.o: %.c
+	mkdir -p $(dir $@)
 	x86_64-nightingale-gcc -o $@ -c $< -ffreestanding -Wall -Werror
 
 $(ZIGLIB): $(ZIGSRC)
-	zig build-lib $(ZIGMAIN) --output-dir obj -target x86_64-freestanding
+	mkdir -p $(dir $@)
+	zig build-obj $(ZIGMAIN) -femit-bin=$@ -target x86_64-freestanding -mno-red-zone -mcmodel=kernel
 
 oriole.elf: $(OBJECTS) $(ZIGLIB)
 	ld -g -nostdlib -o $@ -T link.ld $^
@@ -42,4 +44,3 @@ clean:
 	rm -rf obj
 	rm -f oriole.elf
 	rm -f oriole.iso
-

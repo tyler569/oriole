@@ -2,7 +2,7 @@
 
 section .text
 
-# outN(port, value)
+; outN(port, value)
 global outb
 outb:
     mov eax, esi
@@ -25,7 +25,7 @@ outl:
     ret
 
 
-# inN(port)
+; inN(port)
 global inb
 inb:
     mov edx, edi
