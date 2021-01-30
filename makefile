@@ -1,6 +1,6 @@
 BUILDMODE ?= debug
 
-CC := x86_64-elf-gcc
+CC := zig cc
 
 ZIGMAIN := kernel/main.zig
 ZIGSRC := $(shell find kernel -name '*.zig')
@@ -10,6 +10,8 @@ ASMSRC := $(shell find asm -name '*.asm')
 ASMOBJ := $(patsubst %.asm,%.o,$(ASMSRC))
 CSRC := $(shell find asm -name '*.c')
 COBJ := $(patsubst %.c,%.o,$(CSRC))
+
+MKISO ?= grub-mkrescue
 
 OBJECTS := $(ASMOBJ) $(COBJ)
 
@@ -23,7 +25,7 @@ all: oriole.iso
 
 %.o: %.c
 	mkdir -p $(dir $@)
-	x86_64-nightingale-gcc -o $@ -c $< -ffreestanding -Wall -Werror
+	$(CC) -o $@ -c $< -ffreestanding -Wall -Werror
 
 $(ZIGLIB): $(ZIGSRC)
 	mkdir -p $(dir $@)
@@ -36,7 +38,7 @@ oriole.iso: oriole.elf grub.cfg
 	mkdir -p isodir/boot/grub
 	cp grub.cfg isodir/boot/grub
 	cp oriole.elf isodir/boot/
-	grub2-mkrescue -o $@ isodir/
+	$(MKISO) -o $@ isodir/
 	rm -rf isodir
 
 clean:
