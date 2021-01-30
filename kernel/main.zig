@@ -6,6 +6,7 @@ export fn kernel_main() void {
     interrupts.init();
     serial.init();
     print("Hello World from an all-zig kernel\r\n", .{});
+    interrupts.unmask(4);
     interrupts.enable_irqs();
 
     while (true) {}
@@ -13,7 +14,7 @@ export fn kernel_main() void {
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace) noreturn {
     interrupts.disable_irqs();
-    print("panic: {}\r\n", .{msg});
+    print("panic: {s}\r\n", .{msg});
     while (true) {}
 }
 

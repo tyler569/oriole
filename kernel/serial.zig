@@ -4,9 +4,6 @@ const interrupts = @import("interrupts.zig");
 extern fn inb(port: u16) u8;
 extern fn outb(port: u16, byte: u8) void;
 
-extern fn enable_irqs() void;
-extern fn disable_irqs() void;
-
 const UART_DATA = 0;
 const UART_INTERRUPT_ENABLE = 1;
 
