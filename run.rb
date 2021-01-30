@@ -2,103 +2,67 @@
 
 require 'optparse'
 
-class Array
-  def move_to_end(value)
-    exists = self.include? value
-    self.delete value
-    self << value if exists
-  end
-end
-
-class QemuInvocation
-  attr_accessor :ram, :file, :qemu, :flags
-
-  DEFAULT_ARGS = {
-    ram: '32M',
-    file: 'oriole.iso',
-    qemu: 'qemu-system-x86_64',
-    flags: [:serial, :no_video, :serial2, :tee]
-  }
-
-  OPTION_CONFLICTS = [
-    [:monitor, :serial],
-    [:monitor, :tee],
-  ]
-
-  OPTION_STRINGS = {
-    debug: '-S',
-    monitor: '-monitor stdio',
-    serial: '-serial stdio',
-    interrupts: '-d int',
-    no_video: '-display none',
-    test_mode: '--device isa-debug-exit',
-    serial2: '-serial unix:./serial2,nowait,server',
-    tee: '| tee last_output',
-  }
-
-  def resolve_conflicts(silent: false)
-    tmp_flags = @flags.clone
-    for flag, conflict in OPTION_CONFLICTS
-      if tmp_flags.include? flag and tmp_flags.include? conflict
-        tmp_flags.delete conflict
-        puts "Warning: removing :#{conflict} due to conflict with :#{flag}" unless silent
-      end
-    end
-    yield tmp_flags
-  end
-
-  def resolve_conflicts!(silent: true)
-    resolve_conflicts(silent: silent) do |flags|
-      @flags = flags
-    end
-  end
-
-  def initialize(args = {})
-    args = DEFAULT_ARGS.merge(args)
-    @ram = args[:ram]
-    @file = args[:file]
-    @qemu = args[:qemu]
-    @flags = args[:flags]
-  end
-
-  def qemu_command
-    "#{@qemu} -s -vga std -no-reboot -m #{ram} -cdrom #{file}"
-  end
-
-  def render
-    resolve_conflicts do |flags|
-      flags.move_to_end :tee
-
-      "#{qemu_command} #{flags.map { |f| OPTION_STRINGS[f] }.join(" ")}"
-    end
-  end
-end
-
-trap "SIGINT" do
-  exit
-end
-
-q = QemuInvocation.new
-# q.flags << :monitor
-# q.resolve_conflicts!
-
-dry_run = false
-
+options = {
+  file: "oriole.iso",
+  ram: "32M",
+  serial: true,
+  tee: true,
+}
 OptionParser.new do |opts|
-  opts.banner = "Usage: run.rb [options]"
-
-  opts.on("-f FILE", "--file FILE") { |v| q.file = v }
-  opts.on("-q QEMU", "--qemu QEMU") { |v| q.qemu = v }
-  opts.on("-r RAM", "--ram RAM") { |v| q.ram = v }
-  opts.on("-m", "--monitor") { |v| q.flags << :monitor }
-  opts.on("-i", "--interrupts") { |v| q.flags << :interrupts }
-  opts.on("-v", "--video") { |v| q.flags.delete :no_video }
-  opts.on("-d", "--debug") { |v| q.flags << :debug }
-  opts.on("--dry-run") { |v| dry_run = true }
+  opts.on("-f", "--file FILE", "ISO to boot") { |f| options[:file] = f }
+  opts.on("-r", "--ram RAM", "Set emulated machine RAM") { |r| options[:ram] = r }
+  opts.on("-d", "--debug", "Wait for GDB connection") { options[:debug] = true }
+  opts.on("-v", "--video", "Enable QEMU graphical video output") { options[:video] = true }
+  opts.on("-i", "--interrupts", "Enable QEMU interrupt debugging") { options[:interrupts] = true }
+  opts.on("-n", "--no-serial", "Do not use serial stdio") { options[:serial] = false }
+  opts.on("-m", "--monitor", "Show the QEMU monitor on stdio (implies --no-serial, --no-tee)") { options[:monitor] = true }
+  opts.on("-x", "--net", "Attach a network interface") { options[:net] = true }
+  opts.on("-t", "--no-tee", "Do not tee output to ./last_output") { options[:tee] = false }
+  opts.on("--serial2-socket", "Attach a socket to the second serial port") { options[:s2socket] = true }
+  opts.on("--serial2-file FILE", "Attach a file to the second serial port") { |f| options[:s2file] = f }
+  opts.on("--test-mode", "Run in test mode (attach isa-debug-exit device)") { options[:test] = true }
+  opts.on("--dry-run", "Just print the QEMU command, don't run it") { options[:dry_run] = true }
 end.parse!
 
-p q
-puts q.render
+options[:serial] = false if options[:monitor]
+options[:tee] = false if options[:monitor]
 
-system(q.render) unless dry_run
+QEMU = "qemu-system-x86_64"
 
+qemu_command = [
+  QEMU,
+  "-s",
+  "-vga std",
+  "-no-reboot",
+  "-m #{options[:ram]}",
+  "-cdrom #{options[:file]}",
+]
+
+qemu_command << "-S" if options[:debug]
+qemu_command << "-monitor stdio" if options[:monitor]
+qemu_command << "-serial stdio" if options[:serial]
+qemu_command << "-d int" if options[:interrupts]
+qemu_command << "-display none" unless options[:video]
+qemu_command << "--device isa-debug-exit" if options[:test]
+qemu_command << "-serial unix:./serial2,nowait,server" if options[:s2socket]
+qemu_command << "-serial file:./#{options[:s2file]}" if options[:s2file]
+
+if options[:net]
+  qemu_command << "-device rtl8139,netdev=net0"
+  qemu_command << "-netdev tap,id=net0,script=no,downscript=no,ifname=tap0"
+  qemu_command << "-object filter-dump,id=dump0,netdev=net0,file=tap0.pcap"
+end
+
+qemu_command += ARGV
+qemu_command << "| tee last_output" if options[:tee]
+
+cmd = qemu_command.join(" ")
+puts cmd
+
+exit if options[:dry_run]
+
+trap "SIGINT" do
+  exit 0
+end
+
+system cmd
