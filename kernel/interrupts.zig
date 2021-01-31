@@ -26,19 +26,7 @@ pub fn init() void {
     unmask(2); // cascade irq
 }
 
-pub fn mask(irq: i32) void {
-    if (irq > 8) {
-        var new_mask = inb(CHILD_PIC_DATA);
-        new_mask &= ~(1 << (irq - 8));
-        outb(CHILD_PIC_DATA, new_mask);
-    } else {
-        var new_mask = inb(PRIMARY_PIC_DATA);
-        new_mask &= ~(1 << irq);
-        outb(PRIMARY_PIC_DATA, new_mask);
-    }
-}
-
-pub fn unmask(irq: u4) void {
+pub fn mask(irq: u4) void {
     if (irq > 8) {
         const l = @intCast(u3, irq - 8);
         var new_mask = inb(CHILD_PIC_DATA);
@@ -48,6 +36,20 @@ pub fn unmask(irq: u4) void {
         const l = @intCast(u3, irq);
         var new_mask = inb(PRIMARY_PIC_DATA);
         new_mask |= (@as(u8, 1) << l);
+        outb(PRIMARY_PIC_DATA, new_mask);
+    }
+}
+
+pub fn unmask(irq: u4) void {
+    if (irq > 8) {
+        const l = @intCast(u3, irq - 8);
+        var new_mask = inb(CHILD_PIC_DATA);
+        new_mask &= ~(@as(u8, 1) << l);
+        outb(CHILD_PIC_DATA, new_mask);
+    } else {
+        const l = @intCast(u3, irq);
+        var new_mask = inb(PRIMARY_PIC_DATA);
+        new_mask &= ~(@as(u8, 1) << l);
         outb(PRIMARY_PIC_DATA, new_mask);
     }
 }
